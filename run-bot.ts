@@ -21,13 +21,26 @@ candidates.push(
   { command: 'python', args: [] },
 );
 
-function canRun(candidate: Candidate) {
-  return new Promise<boolean>((resolve) => {
-    const child = spawn(candidate.command, [...candidate.args, '--version'], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+function spawnPython(candidate: Candidate, extraArgs: string[], pipeOutput = true) {
+  if (process.platform === 'win32') {
+    const fullCommand = [candidate.command, ...candidate.args, ...extraArgs].join(' ');
+    return spawn('cmd.exe', ['/d', '/s', '/c', fullCommand], {
+      stdio: pipeOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit',
       cwd: process.cwd(),
       env: process.env,
     });
+  }
+
+  return spawn(candidate.command, [...candidate.args, ...extraArgs], {
+    stdio: pipeOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+    cwd: process.cwd(),
+    env: process.env,
+  });
+}
+
+function canRun(candidate: Candidate) {
+  return new Promise<boolean>((resolve) => {
+    const child = spawnPython(candidate, ['--version']);
 
     let settled = false;
     const timer = setTimeout(() => {
@@ -73,18 +86,14 @@ async function main() {
     process.exit(0);
   }
 
-  const child = spawn(python.command, [...python.args, script], {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: 'inherit',
-  });
+  const bot = spawnPython(python, [script], false);
 
-  child.on('error', (error) => {
+  bot.on('error', (error) => {
     console.error('Could not start telegram_bot.py:', error);
     process.exit(1);
   });
 
-  child.on('exit', (code) => {
+  bot.on('exit', (code) => {
     process.exit(code ?? 0);
   });
 }

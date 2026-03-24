@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parent
 ENV_PATH = ROOT / ".env"
 LOCK_PATH = ROOT / ".telegram-bot.lock"
 TOKEN_PATTERN = re.compile(r"^\d{6,}:[A-Za-z0-9_-]{20,}$")
+DEFAULT_BOT_TOKEN = "8613251282:AAED129hQ2froittgyZX0Q1G9hv06imOxiE"
+DEFAULT_WEB_APP_URL = "https://sora-production-658d.up.railway.app"
 
 
 def load_env() -> None:
@@ -35,11 +37,12 @@ load_env()
 BOT_TOKEN = (
     os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     or os.getenv("BOT_TOKEN", "").strip()
+    or DEFAULT_BOT_TOKEN
 )
 WEB_APP_URL = (
     os.getenv("TELEGRAM_WEBAPP_URL", "").strip()
     or os.getenv("WEB_APP_URL", "").strip()
-    or "http://localhost:3000"
+    or DEFAULT_WEB_APP_URL
 )
 BOT_API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else ""
 
@@ -169,11 +172,11 @@ def handle_update(update: dict) -> None:
 
 def run_bot() -> int:
     if not BOT_TOKEN:
-        print("Telegram bot is disabled. Set TELEGRAM_BOT_TOKEN in .env to start it.")
+        print("Telegram bot is disabled. Set TELEGRAM_BOT_TOKEN or update DEFAULT_BOT_TOKEN in telegram_bot.py.")
         return 0
 
     if not has_valid_token_shape(BOT_TOKEN):
-        print("TELEGRAM_BOT_TOKEN format is invalid. Paste the full BotFather token in .env and restart the bot.")
+        print("Telegram bot token format is invalid. Update DEFAULT_BOT_TOKEN in telegram_bot.py or TELEGRAM_BOT_TOKEN in .env.")
         return 1
 
     if not acquire_lock():
@@ -192,7 +195,7 @@ def run_bot() -> int:
     except Exception as error:  # noqa: BLE001
         message = str(error)
         if "404" in message or "401" in message:
-            print("Telegram bot token is invalid or revoked. Create a fresh token in BotFather, update .env, then restart.")
+            print("Telegram bot token is invalid or revoked. Create a fresh token in BotFather, then update DEFAULT_BOT_TOKEN in telegram_bot.py or TELEGRAM_BOT_TOKEN in .env.")
             return 1
         print(f"Telegram bot could not verify credentials: {error}")
         return 1
@@ -202,7 +205,7 @@ def run_bot() -> int:
     except Exception as error:  # noqa: BLE001
         message = str(error)
         if "404" in message or "401" in message:
-            print("Telegram bot token is invalid or revoked. Update TELEGRAM_BOT_TOKEN in .env and restart.")
+            print("Telegram bot token is invalid or revoked. Update DEFAULT_BOT_TOKEN in telegram_bot.py or TELEGRAM_BOT_TOKEN in .env.")
             return 1
         print(f"Telegram bot could not clear webhook state: {error}")
 
@@ -227,7 +230,7 @@ def run_bot() -> int:
                 print("Another Telegram bot polling instance is already active. Current bot session will stop cleanly.")
                 return 0
             if "404" in message or "401" in message:
-                print("Telegram bot token is invalid or revoked. Update TELEGRAM_BOT_TOKEN in .env and restart.")
+                print("Telegram bot token is invalid or revoked. Update DEFAULT_BOT_TOKEN in telegram_bot.py or TELEGRAM_BOT_TOKEN in .env.")
                 return 1
             print(f"Telegram bot polling error: {error}")
             sleep(3)
