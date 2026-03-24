@@ -1,0 +1,7 @@
+{
+  "name": "Sora AI",
+  "description": "Sora AI - O'zbekistonliklar uchun maxsus yaratilgan, noldan IELTSgacha o'rgatuvchi aqlli ingliz tili o'qituvchisi.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

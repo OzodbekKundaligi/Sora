@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Plus Jakarta Sans", sans-serif;
+  --font-body: "Be Vietnam Pro", sans-serif;
+
+  --color-primary: #0058bd;
+  --color-primary-container: #1470e8;
+  --color-primary-fixed: #d8e2ff;
+  --color-on-primary-fixed: #001a41;
+  --color-on-primary-fixed-variant: #004494;
+
+  --color-secondary: #934b00;
+  --color-secondary-container: #fd8603;
+  --color-secondary-fixed: #ffdcc4;
+  --color-on-secondary-fixed: #301400;
+  --color-on-secondary-fixed-variant: #703800;
+
+  --color-background: #f9f9ff;
+  --color-surface: #f9f9ff;
+  --color-on-surface: #191b23;
+  --color-on-surface-variant: #414754;
+
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f3fd;
+  --color-surface-container: #ecedf8;
+  --color-surface-container-high: #e6e8f2;
+  --color-surface-container-highest: #e1e2ec;
+
+  --color-outline: #727785;
+  --color-outline-variant: #c2c6d6;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+    --color-primary: #7fb5ff;
+    --color-primary-container: #3f82f2;
+    --color-primary-fixed: #0f264d;
+    --color-on-primary-fixed: #dbe9ff;
+    --color-on-primary-fixed-variant: #b7d3ff;
+
+    --color-secondary: #ffb066;
+    --color-secondary-container: #ff9b3d;
+    --color-secondary-fixed: #4e2600;
+    --color-on-secondary-fixed: #ffecdd;
+    --color-on-secondary-fixed-variant: #ffd4ad;
+
+    --color-background: #0d1522;
+    --color-surface: #0d1522;
+    --color-on-surface: #f4f7ff;
+    --color-on-surface-variant: #b7c0d5;
+
+    --color-surface-container-lowest: #111c2b;
+    --color-surface-container-low: #162234;
+    --color-surface-container: #1a273c;
+    --color-surface-container-high: #21304a;
+    --color-surface-container-highest: #293955;
+
+    --color-outline: #8392ae;
+    --color-outline-variant: #34445f;
+  }
+
+  html,
+  body {
+    @apply bg-background text-on-surface font-body;
+    min-height: 100%;
+    transition:
+      background-color 180ms ease,
+      color 180ms ease;
+  }
+}
+
+.glass-nav {
+  backdrop-filter: blur(18px);
+  background: color-mix(in oklab, var(--color-surface-container-lowest) 84%, transparent);
+  border-bottom: 1px solid var(--color-surface-container);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
