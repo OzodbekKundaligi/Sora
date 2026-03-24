@@ -6,5 +6,8 @@ coverage/
 *.log
 *.db
 .telegram-bot.lock
+__pycache__/
+.pytest_cache/
+.venv/
 .env*
 !.env.example

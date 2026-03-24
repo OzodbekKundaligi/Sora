@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx dev.ts",
     "site": "tsx server.ts",
-    "bot": "tsx telegram-bot.ts",
+    "bot": "tsx run-bot.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

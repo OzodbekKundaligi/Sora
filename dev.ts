@@ -96,7 +96,7 @@ async function main() {
     wireProcess('site', startProcess('site', 'server.ts'));
   }
 
-  wireProcess('bot', startProcess('bot', 'telegram-bot.ts'), true);
+  wireProcess('bot', startProcess('bot', 'run-bot.ts'), true);
 }
 
 void main();
