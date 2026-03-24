@@ -15,6 +15,12 @@ const __dirname = path.dirname(__filename);
 
 const db = new Database("fluencyflow.db");
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
+const isRailwayRuntime = Boolean(
+  process.env.RAILWAY_ENVIRONMENT_NAME
+  || process.env.RAILWAY_PUBLIC_DOMAIN
+  || process.env.RAILWAY_STATIC_URL
+);
+const isProductionRuntime = process.env.NODE_ENV === "production" || isRailwayRuntime;
 
 // Initialize DB
 db.exec(`
@@ -164,7 +170,7 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProductionRuntime) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -179,7 +185,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT} in ${isProductionRuntime ? "production" : "development"} mode`);
   });
 }
 

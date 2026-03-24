@@ -17,6 +17,9 @@ if (process.platform === 'win32') {
 }
 
 candidates.push(
+  { command: '/opt/venv/bin/python', args: [] },
+  { command: '/opt/venv/bin/python3', args: [] },
+  { command: 'python3.11', args: [] },
   { command: 'python3', args: [] },
   { command: 'python', args: [] },
 );
