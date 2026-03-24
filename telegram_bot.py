@@ -1,6 +1,7 @@
 import atexit
 import json
 import os
+import re
 import signal
 import sys
 import time
@@ -12,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 ENV_PATH = ROOT / ".env"
 LOCK_PATH = ROOT / ".telegram-bot.lock"
+TOKEN_PATTERN = re.compile(r"^\d{6,}:[A-Za-z0-9_-]{20,}$")
 
 
 def load_env() -> None:
@@ -30,8 +32,15 @@ def load_env() -> None:
 
 load_env()
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "ilo8613251282:AAEYj1DHZFnb2WZAeG3CIBD4kvC0HV-1zHM").strip()
-WEB_APP_URL = os.getenv("TELEGRAM_WEBAPP_URL", "http://localhost:3000").strip() or "http://localhost:3000"
+BOT_TOKEN = (
+    os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    or os.getenv("BOT_TOKEN", "").strip()
+)
+WEB_APP_URL = (
+    os.getenv("TELEGRAM_WEBAPP_URL", "").strip()
+    or os.getenv("WEB_APP_URL", "").strip()
+    or "http://localhost:3000"
+)
 BOT_API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else ""
 
 
@@ -100,6 +109,17 @@ def telegram_request(method: str, payload: dict) -> dict:
     return data
 
 
+def has_valid_token_shape(token: str) -> bool:
+    return bool(TOKEN_PATTERN.match(token))
+
+
+def validate_bot_connection() -> None:
+    result = telegram_request("getMe", {}).get("result", {})
+    username = result.get("username", "unknown")
+    bot_id = result.get("id", "unknown")
+    print(f"Telegram bot connected as @{username} (id: {bot_id}).")
+
+
 def create_launch_button() -> dict:
     if WEB_APP_URL.startswith("https://"):
         return {"inline_keyboard": [[{"text": "Sora AI", "web_app": {"url": WEB_APP_URL}}]]}
@@ -152,6 +172,10 @@ def run_bot() -> int:
         print("Telegram bot is disabled. Set TELEGRAM_BOT_TOKEN in .env to start it.")
         return 0
 
+    if not has_valid_token_shape(BOT_TOKEN):
+        print("TELEGRAM_BOT_TOKEN format is invalid. Paste the full BotFather token in .env and restart the bot.")
+        return 1
+
     if not acquire_lock():
         return 0
 
@@ -164,8 +188,22 @@ def run_bot() -> int:
         print("TELEGRAM_WEBAPP_URL is local. Use a public HTTPS URL for real Telegram devices.")
 
     try:
+        validate_bot_connection()
+    except Exception as error:  # noqa: BLE001
+        message = str(error)
+        if "404" in message or "401" in message:
+            print("Telegram bot token is invalid or revoked. Create a fresh token in BotFather, update .env, then restart.")
+            return 1
+        print(f"Telegram bot could not verify credentials: {error}")
+        return 1
+
+    try:
         telegram_request("deleteWebhook", {"drop_pending_updates": False})
     except Exception as error:  # noqa: BLE001
+        message = str(error)
+        if "404" in message or "401" in message:
+            print("Telegram bot token is invalid or revoked. Update TELEGRAM_BOT_TOKEN in .env and restart.")
+            return 1
         print(f"Telegram bot could not clear webhook state: {error}")
 
     offset = 0
@@ -188,6 +226,9 @@ def run_bot() -> int:
             if "409" in message:
                 print("Another Telegram bot polling instance is already active. Current bot session will stop cleanly.")
                 return 0
+            if "404" in message or "401" in message:
+                print("Telegram bot token is invalid or revoked. Update TELEGRAM_BOT_TOKEN in .env and restart.")
+                return 1
             print(f"Telegram bot polling error: {error}")
             sleep(3)
 
