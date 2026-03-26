@@ -78,10 +78,12 @@ export interface PronunciationFeedback {
 
 export interface WritingEvaluation {
   score: number;
+  bandEstimate: string;
   wordCount: number;
   feedback: string[];
   strengths: string[];
   correctedSample: string;
+  strongerRewrite: string;
   nextTask: string;
 }
 
@@ -1068,6 +1070,48 @@ export async function analyzeSpeakingChallenge(transcript: string, prompt: strin
   };
 }
 
+function scoreToBandEstimate(score: number) {
+  if (score >= 92) return '8.0';
+  if (score >= 86) return '7.5';
+  if (score >= 78) return '6.5';
+  if (score >= 70) return '6.0';
+  if (score >= 62) return '5.5';
+  if (score >= 54) return '5.0';
+  if (score >= 46) return '4.5';
+  return '4.0';
+}
+
+function buildStrongerRewrite(
+  text: string,
+  correctedText: string,
+  level = 'A0',
+  needsConnector: boolean,
+) {
+  let rewrite = (correctedText || text).replace(/\s+/g, ' ').trim();
+
+  if (!rewrite) {
+    return '';
+  }
+
+  if (!/[.!?]$/.test(rewrite)) {
+    rewrite += '.';
+  }
+
+  if (needsConnector) {
+    rewrite += ' This is important because it gives a clear reason.';
+  }
+
+  if (levelRank(level) >= levelRank('B1') && !/\bfor example\b/i.test(rewrite)) {
+    rewrite += ' For example, it can improve real results over time.';
+  }
+
+  if (levelRank(level) >= levelRank('B2') && !/\bhowever\b/i.test(rewrite)) {
+    rewrite += ' However, it still needs consistent practice and stronger detail.';
+  }
+
+  return rewrite;
+}
+
 export function evaluateWritingSubmission(
   text: string,
   level = 'A0',
@@ -1141,10 +1185,17 @@ export function evaluateWritingSubmission(
 
   return {
     score,
+    bandEstimate: scoreToBandEstimate(score),
     wordCount,
     feedback,
     strengths,
     correctedSample: grammar.hasError ? grammar.correctedText : trimmed,
+    strongerRewrite: buildStrongerRewrite(
+      trimmed,
+      grammar.hasError ? grammar.correctedText : trimmed,
+      level,
+      !hasConnector,
+    ),
     nextTask,
   };
 }

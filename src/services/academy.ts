@@ -1,7 +1,15 @@
 import { lessons, readingPassages, writingPrompts } from '../lib/courseData';
 import { grammarTopics, vocabularyBank } from '../lib/courseData';
 import type { LocalizedText } from '../lib/i18n';
-import { getCompletedLessonCount, getLearnedWordCount, getUserData } from '../lib/localData';
+import {
+  getCompletedLessonCount,
+  getDailyMissionRecord,
+  getLearnedWordCount,
+  getPlacementTestResult,
+  getTeacherContent,
+  getUserData,
+  unlockAchievement,
+} from '../lib/localData';
 import { getRoleplayScenarioForLevel } from './sora-ai';
 
 export interface ListeningLesson {
@@ -21,6 +29,7 @@ export interface DailyPlanItem {
   id: string;
   title: LocalizedText;
   description: LocalizedText;
+  minutes: number;
   route: '/lessons' | '/practice' | '/chat';
   routeState?: Record<string, unknown>;
 }
@@ -40,6 +49,51 @@ export interface CertificateStatus {
     label: LocalizedText;
     complete: boolean;
   }>;
+}
+
+export interface RoadmapStageStatus {
+  level: string;
+  focus: string;
+  unlocked: boolean;
+  current: boolean;
+  completed: boolean;
+  requirements: string[];
+}
+
+export interface PlacementQuestion {
+  id: string;
+  prompt: string;
+  options: Array<{
+    id: string;
+    text: string;
+    score: number;
+  }>;
+}
+
+export interface PlacementEvaluation {
+  score: number;
+  level: string;
+  recommendedFocus: string[];
+}
+
+export interface AchievementCard {
+  id: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+}
+
+export interface DailyMissionSummary {
+  totalMinutes: number;
+  completedCount: number;
+  totalCount: number;
+  items: DailyPlanItem[];
+}
+
+export interface ProgressSummary {
+  today: string;
+  tomorrow: string;
+  streakWarning: string | null;
 }
 
 export interface MockExam {
@@ -278,6 +332,49 @@ export function getLevelRoadmap() {
   ];
 }
 
+function getStageRequirement(level: string) {
+  const requirements: Record<string, string[]> = {
+    A0: ['Start with placement or first lesson'],
+    A1: ['Complete 3 A0 lessons', 'Finish 1 vocabulary session'],
+    A2: ['Complete 6 A1/A0 lessons', 'Finish 1 writing task'],
+    B1: ['Complete 10 lessons', 'Finish 2 listening drills', 'Finish 1 roleplay'],
+    B2: ['Complete 16 lessons', 'Finish 2 writing tasks', 'Finish 1 mock'],
+    C1: ['Complete 24 lessons', 'Learn 35 active words', 'Finish 2 mocks'],
+    IELTS: ['Reach C1 readiness', 'Finish 3 mocks', 'Keep weekly study streak'],
+  };
+
+  return requirements[level] || [];
+}
+
+export function getRoadmapStageStatuses(userId: number, level = 'A0'): RoadmapStageStatus[] {
+  const completedLessons = getCompletedLessonCount(userId);
+  const learnedWords = getLearnedWordCount(userId);
+  const userData = getUserData(userId);
+
+  return getLevelRoadmap().map((stage, index) => {
+    const currentRank = levelRank(level);
+    const stageRank = levelRank(stage.level);
+    const unlocked =
+      stage.level === 'A0'
+      || stageRank <= currentRank
+      || (stage.level === 'A1' && completedLessons >= 3)
+      || (stage.level === 'A2' && completedLessons >= 6 && userData.writingSubmissions.length >= 1)
+      || (stage.level === 'B1' && completedLessons >= 10 && userData.listeningSubmissions.length >= 2)
+      || (stage.level === 'B2' && completedLessons >= 16 && userData.mockAttempts.length >= 1)
+      || (stage.level === 'C1' && completedLessons >= 24 && learnedWords >= 35 && userData.mockAttempts.length >= 2)
+      || (stage.level === 'IELTS' && currentRank >= levelRank('C1') && userData.mockAttempts.length >= 3);
+
+    return {
+      level: stage.level,
+      focus: stage.focus,
+      unlocked,
+      current: stage.level === level,
+      completed: stageRank < currentRank,
+      requirements: getStageRequirement(stage.level),
+    };
+  });
+}
+
 export function getListeningLessonForLevel(level = 'A0', lessonId?: string) {
   return pickForLevel(listeningLessons, level, lessonId);
 }
@@ -310,6 +407,7 @@ export function getDailyPlan(userId: number, level = 'A0'): DailyPlanItem[] {
       id: 'daily-lesson',
       title: { uz: 'Bugungi dars', en: 'Today lesson', ru: 'Today lesson' },
       description: nextLesson.title,
+      minutes: 5,
       route: '/lessons',
     },
     {
@@ -320,6 +418,7 @@ export function getDailyPlan(userId: number, level = 'A0'): DailyPlanItem[] {
         en: `Review ${Math.max(dueWords, 4)} words`,
         ru: `Review ${Math.max(dueWords, 4)} words`,
       },
+      minutes: 4,
       route: '/practice',
       routeState: { tab: 'vocabulary' },
     },
@@ -327,6 +426,7 @@ export function getDailyPlan(userId: number, level = 'A0'): DailyPlanItem[] {
       id: 'daily-listening',
       title: { uz: 'Listening', en: 'Listening', ru: 'Listening' },
       description: listening.title,
+      minutes: 4,
       route: '/practice',
       routeState: { tab: 'listening', lessonId: listening.id },
     },
@@ -334,6 +434,7 @@ export function getDailyPlan(userId: number, level = 'A0'): DailyPlanItem[] {
       id: 'daily-writing',
       title: { uz: 'Writing', en: 'Writing', ru: 'Writing' },
       description: writing.title,
+      minutes: 4,
       route: '/practice',
       routeState: { tab: 'writing', promptId: writing.id },
     },
@@ -341,10 +442,25 @@ export function getDailyPlan(userId: number, level = 'A0'): DailyPlanItem[] {
       id: 'daily-roleplay',
       title: { uz: 'Speaking roleplay', en: 'Speaking roleplay', ru: 'Speaking roleplay' },
       description: roleplay.title,
+      minutes: 3,
       route: '/practice',
       routeState: { tab: 'roleplay', roleplayId: roleplay.id },
     },
   ];
+}
+
+export function getDailyMissionSummary(userId: number, level = 'A0'): DailyMissionSummary {
+  const items = getDailyPlan(userId, level);
+  const record = getDailyMissionRecord(userId);
+  const itemIds = new Set(items.map((item) => item.id));
+  const completedCount = (record?.completedIds || []).filter((id) => itemIds.has(id)).length;
+
+  return {
+    totalMinutes: items.reduce((total, item) => total + item.minutes, 0),
+    completedCount,
+    totalCount: items.length,
+    items,
+  };
 }
 
 export function getWeeklyReport(userId: number): WeeklyReport {
@@ -397,6 +513,10 @@ export function getCertificateStatus(userId: number, level = 'A0'): CertificateS
       complete: userData.mockAttempts.length >= 1,
     },
     {
+      label: { uz: 'Placement test yakunlangan', en: 'Complete the placement test', ru: 'Complete the placement test' },
+      complete: Boolean(getPlacementTestResult(userId)),
+    },
+    {
       label: { uz: 'B2 yoki undan yuqori daraja', en: 'Reach B2 or above', ru: 'Reach B2 or above' },
       complete: levelRank(level) >= levelRank('B2'),
     },
@@ -415,6 +535,169 @@ export function getCertificateStatus(userId: number, level = 'A0'): CertificateS
     ready: requirements.every((item) => item.complete),
     requirements,
   };
+}
+
+export function getPlacementQuestions(): PlacementQuestion[] {
+  return [
+    {
+      id: 'q1',
+      prompt: 'How comfortable are you with English letters and sounds?',
+      options: [
+        { id: 'q1-a', text: 'I am just starting from zero.', score: 10 },
+        { id: 'q1-b', text: 'I know basic letters and some words.', score: 20 },
+        { id: 'q1-c', text: 'I read simple short texts already.', score: 35 },
+      ],
+    },
+    {
+      id: 'q2',
+      prompt: 'Can you introduce yourself in English?',
+      options: [
+        { id: 'q2-a', text: 'Only 1-2 words.', score: 10 },
+        { id: 'q2-b', text: 'A few simple sentences.', score: 22 },
+        { id: 'q2-c', text: 'A clear paragraph with detail.', score: 38 },
+      ],
+    },
+    {
+      id: 'q3',
+      prompt: 'How well do you understand short audio in English?',
+      options: [
+        { id: 'q3-a', text: 'Almost not yet.', score: 10 },
+        { id: 'q3-b', text: 'If it is slow and simple.', score: 24 },
+        { id: 'q3-c', text: 'Normal speed daily topics.', score: 40 },
+      ],
+    },
+    {
+      id: 'q4',
+      prompt: 'How confident are you in writing English?',
+      options: [
+        { id: 'q4-a', text: 'I write single words or very short lines.', score: 10 },
+        { id: 'q4-b', text: 'I can write a short paragraph.', score: 25 },
+        { id: 'q4-c', text: 'I can write essays with structure.', score: 45 },
+      ],
+    },
+    {
+      id: 'q5',
+      prompt: 'What is your current target?',
+      options: [
+        { id: 'q5-a', text: 'Start from zero and speak simply.', score: 10 },
+        { id: 'q5-b', text: 'Daily communication and confidence.', score: 24 },
+        { id: 'q5-c', text: 'IELTS or advanced fluency.', score: 42 },
+      ],
+    },
+  ];
+}
+
+export function evaluatePlacementAnswers(answerIds: string[]): PlacementEvaluation {
+  const questionMap = getPlacementQuestions();
+  const score = questionMap.reduce((total, question) => {
+    const answer = question.options.find((option) => option.id === answerIds.find((id) => id.startsWith(question.id)));
+    return total + (answer?.score || 0);
+  }, 0);
+
+  const level =
+    score >= 180 ? 'B2'
+    : score >= 145 ? 'B1'
+    : score >= 105 ? 'A2'
+    : score >= 70 ? 'A1'
+    : 'A0';
+
+  const recommendedFocus =
+    level === 'A0'
+      ? ['Alphabet and sounds', 'First words', 'Greeting roleplay']
+      : level === 'A1'
+        ? ['Daily speaking', 'Basic listening', 'Short writing']
+        : level === 'A2'
+          ? ['Reading for detail', 'Controlled grammar', 'Routine speaking']
+          : level === 'B1'
+            ? ['Opinion speaking', 'Paragraph writing', 'Listening speed']
+            : ['Mock exams', 'Essay control', 'IELTS speaking practice'];
+
+  return {
+    score,
+    level,
+    recommendedFocus,
+  };
+}
+
+export function getAchievementCards(userId: number, level = 'A0'): AchievementCard[] {
+  const userData = getUserData(userId);
+  const lessonCount = getCompletedLessonCount(userId);
+  const learnedWords = getLearnedWordCount(userId);
+  const cards: AchievementCard[] = [
+    {
+      id: 'first-steps',
+      title: 'First Steps',
+      description: 'Finish your first 3 lessons.',
+      unlocked: lessonCount >= 3,
+    },
+    {
+      id: 'daily-engine',
+      title: 'Daily Engine',
+      description: 'Keep a 5-day streak.',
+      unlocked: Boolean(userData.dailyMissionRecords.length >= 5),
+    },
+    {
+      id: 'word-builder',
+      title: 'Word Builder',
+      description: 'Learn 25 active words.',
+      unlocked: learnedWords >= 25,
+    },
+    {
+      id: 'essay-starter',
+      title: 'Essay Starter',
+      description: 'Submit 2 checked writing tasks.',
+      unlocked: userData.writingSubmissions.length >= 2,
+    },
+    {
+      id: 'listening-gear',
+      title: 'Listening Gear',
+      description: 'Finish 3 listening drills.',
+      unlocked: userData.listeningSubmissions.length >= 3,
+    },
+    {
+      id: 'mock-ready',
+      title: 'Mock Ready',
+      description: 'Finish your first mock exam.',
+      unlocked: userData.mockAttempts.length >= 1,
+    },
+    {
+      id: 'b2-gate',
+      title: 'B2 Gate',
+      description: 'Reach B2 readiness.',
+      unlocked: levelRank(level) >= levelRank('B2'),
+    },
+  ];
+
+  cards.filter((card) => card.unlocked).forEach((card) => unlockAchievement(userId, card.id));
+  return cards;
+}
+
+export function getProgressSummary(userId: number, level = 'A0'): ProgressSummary {
+  const dailyMission = getDailyMissionSummary(userId, level);
+  const weeklyReport = getWeeklyReport(userId);
+  const stages = getRoadmapStageStatuses(userId, level);
+  const nextStage = stages.find((stage) => !stage.completed && !stage.current && stage.unlocked)
+    || stages.find((stage) => !stage.unlocked);
+
+  return {
+    today: `Today: ${dailyMission.completedCount}/${dailyMission.totalCount} missions, ${weeklyReport.studyDays} study days this week.`,
+    tomorrow: nextStage
+      ? `Tomorrow: keep building toward ${nextStage.level} with ${nextStage.requirements[0] || 'the next mission'}.`
+      : 'Tomorrow: take another mock exam and keep your streak alive.',
+    streakWarning:
+      weeklyReport.studyDays < 3
+        ? 'Study today so your streak does not cool down.'
+        : null,
+  };
+}
+
+export function getTeacherHighlights() {
+  return getTeacherContent().slice(0, 5);
+}
+
+export function getWordOfTheDay(userId: number) {
+  const seed = getCompletedLessonCount(userId) + getLearnedWordCount(userId);
+  return vocabularyBank[seed % vocabularyBank.length];
 }
 
 export function getMockExamForLevel(level = 'A0'): MockExam {

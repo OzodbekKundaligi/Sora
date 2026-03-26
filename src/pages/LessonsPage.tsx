@@ -16,8 +16,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { lessons } from '../lib/courseData';
 import { useTranslateText } from '../lib/i18n';
-import { completeLesson, getUserData, recordLessonVisit } from '../lib/localData';
-import { getCertificateStatus, getLevelRoadmap } from '../services/academy';
+import { completeDailyMissionItem, completeLesson, getUserData, recordLessonVisit } from '../lib/localData';
+import { getCertificateStatus, getLevelRoadmap, getRoadmapStageStatuses, getTeacherHighlights } from '../services/academy';
 
 export default function LessonsPage() {
   const navigate = useNavigate();
@@ -51,14 +51,18 @@ export default function LessonsPage() {
 
   const progress = Math.round((completedIds.size / lessons.length) * 100);
   const roadmap = getLevelRoadmap();
+  const roadmapStages = getRoadmapStageStatuses(user.id, user.level);
   const certificateStatus = getCertificateStatus(user.id, user.level);
+  const teacherHighlights = getTeacherHighlights().filter((item) => item.level === selectedStage).slice(0, 3);
   const stageGroups = roadmap
     .map((stage) => {
       const stageLessons = lessons.filter((lesson) => lesson.level === stage.level);
+      const stageStatus = roadmapStages.find((entry) => entry.level === stage.level);
       return {
         ...stage,
         lessons: stageLessons,
         completed: stageLessons.filter((lesson) => completedIds.has(lesson.id)).length,
+        unlocked: stageStatus?.unlocked ?? stage.level === 'A0',
       };
     })
     .filter((stage) => stage.lessons.length > 0);
@@ -84,6 +88,11 @@ export default function LessonsPage() {
   };
 
   const handleSelectStage = (stageLevel: string) => {
+    const targetStage = stageGroups.find((stage) => stage.level === stageLevel);
+    if (targetStage && !targetStage.unlocked) {
+      return;
+    }
+
     setSelectedStage(stageLevel);
     const stageLessons = lessons.filter((lesson) => lesson.level === stageLevel);
     const nextLesson = stageLessons.find((lesson) => !isLocked(lesson.id)) || stageLessons[0] || lessons[0];
@@ -96,6 +105,7 @@ export default function LessonsPage() {
     }
 
     const nextUser = completeLesson(user.id, selectedLesson.id, selectedLesson.xp);
+    completeDailyMissionItem(user.id, 'daily-lesson');
     if (nextUser) {
       updateUser(nextUser);
     }
@@ -103,9 +113,9 @@ export default function LessonsPage() {
   };
 
   return (
-    <div className="bg-background min-h-screen pb-32">
+    <div className="bg-background min-h-screen pb-36">
       <header className="bg-background sticky top-0 z-40 glass-nav">
-        <div className="px-6 py-4 flex items-center gap-3">
+        <div className="px-4 py-4 sm:px-6 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-surface-container rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6 text-on-surface" />
           </button>
@@ -120,9 +130,9 @@ export default function LessonsPage() {
         </div>
       </header>
 
-      <main className="px-6 pt-6 grid gap-6 xl:grid-cols-[0.95fr_1.25fr] max-w-6xl mx-auto">
+      <main className="px-4 pt-6 grid gap-6 xl:grid-cols-[0.95fr_1.25fr] max-w-6xl mx-auto sm:px-6">
         <section className="space-y-5">
-          <div className="rounded-[2rem] p-6 bg-gradient-to-br from-primary to-primary-container text-white shadow-2xl shadow-primary/15">
+          <div className="rounded-[2rem] p-5 sm:p-6 bg-gradient-to-br from-primary to-primary-container text-white shadow-2xl shadow-primary/15">
             <div className="flex justify-between items-start gap-4">
               <div>
                 <div className="text-xs font-black uppercase tracking-widest opacity-80">
@@ -159,7 +169,8 @@ export default function LessonsPage() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs font-black uppercase tracking-widest text-primary">{stage.level}</div>
-                  <div className="text-xs font-bold text-on-surface-variant">
+                  <div className="text-xs font-bold text-on-surface-variant flex items-center gap-1">
+                    {!stage.unlocked && <Lock className="w-3.5 h-3.5" />}
                     {stage.completed}/{stage.lessons.length}
                   </div>
                 </div>
@@ -184,7 +195,7 @@ export default function LessonsPage() {
                   key={lesson.id}
                   whileHover={!locked ? { scale: 1.01 } : {}}
                   onClick={() => handleSelectLesson(lesson.id)}
-                  className={`w-full text-left p-5 rounded-[1.75rem] border transition-all ${
+                  className={`w-full text-left p-4 sm:p-5 rounded-[1.75rem] border transition-all ${
                     selectedLesson.id === lesson.id
                       ? 'bg-surface-container-lowest border-primary shadow-lg shadow-primary/10'
                       : 'bg-surface-container-lowest border-outline-variant/10'
@@ -223,7 +234,7 @@ export default function LessonsPage() {
         </section>
 
         <section className="space-y-6">
-          <div className="bg-surface-container-lowest rounded-[2rem] p-8 shadow-sm border border-outline-variant/10">
+          <div className="bg-surface-container-lowest rounded-[2rem] p-5 sm:p-8 shadow-sm border border-outline-variant/10">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="text-xs font-black uppercase tracking-widest text-primary">{selectedLesson.level}</div>
@@ -315,11 +326,11 @@ export default function LessonsPage() {
               </div>
             </div>
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleComplete}
                 disabled={completedIds.has(selectedLesson.id)}
-                className={`px-5 py-3.5 rounded-2xl font-bold ${
+                className={`w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold ${
                   completedIds.has(selectedLesson.id)
                     ? 'bg-green-100 text-green-700'
                     : 'bg-primary text-white shadow-lg shadow-primary/20'
@@ -338,7 +349,7 @@ export default function LessonsPage() {
                         : { tab: 'grammar', topicId: selectedLesson.practiceFocus.topicId },
                   })
                 }
-                className="px-5 py-3.5 rounded-2xl font-bold bg-secondary-container text-white shadow-lg shadow-secondary-container/20 flex items-center gap-2"
+                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold bg-secondary-container text-white shadow-lg shadow-secondary-container/20 flex items-center justify-center gap-2"
               >
                 <Dumbbell className="w-5 h-5" />
                 {t({ uz: 'Bog‘liq mashqni ochish', en: 'Open related practice', ru: 'Открыть связанную практику' })}
@@ -346,7 +357,7 @@ export default function LessonsPage() {
             </div>
           </div>
 
-          <div className="bg-surface-container-low rounded-[1.75rem] p-6 border border-outline-variant/10">
+          <div className="bg-surface-container-low rounded-[1.75rem] p-5 sm:p-6 border border-outline-variant/10">
             <div className="text-sm font-black uppercase tracking-widest text-primary">
               {t({ uz: 'Dars tartibi', en: 'Lesson flow', ru: 'Порядок уроков' })}
             </div>
@@ -359,26 +370,35 @@ export default function LessonsPage() {
             </p>
           </div>
 
-          <div className="bg-surface-container-low rounded-[1.75rem] p-6 border border-outline-variant/10">
+          <div className="bg-surface-container-low rounded-[1.75rem] p-5 sm:p-6 border border-outline-variant/10">
             <div className="text-sm font-black uppercase tracking-widest text-primary">Roadmap</div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {roadmap.map((stage) => (
+              {roadmapStages.map((stage) => (
                 <div
                   key={stage.level}
                   className={`rounded-[1.25rem] p-4 border ${
-                    stage.level === user.level
+                    stage.current
                       ? 'border-primary bg-primary/5'
-                      : 'border-outline-variant/10 bg-surface-container-lowest'
+                      : stage.completed
+                        ? 'border-green-200 bg-green-50'
+                        : !stage.unlocked
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-outline-variant/10 bg-surface-container-lowest'
                   }`}
                 >
-                  <div className="text-xs font-black uppercase tracking-widest text-primary">{stage.level}</div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-primary">{stage.level}</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                      {stage.current ? 'Current' : stage.completed ? 'Done' : stage.unlocked ? 'Open' : 'Locked'}
+                    </div>
+                  </div>
                   <div className="mt-2 text-sm text-on-surface-variant">{stage.focus}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-surface-container-low rounded-[1.75rem] p-6 border border-outline-variant/10">
+          <div className="bg-surface-container-low rounded-[1.75rem] p-5 sm:p-6 border border-outline-variant/10">
             <div className="text-sm font-black uppercase tracking-widest text-primary">Certificate readiness</div>
             <div className="mt-4 space-y-3">
               {certificateStatus.requirements.map((item) => (
@@ -395,10 +415,25 @@ export default function LessonsPage() {
               ))}
             </div>
           </div>
+
+          {teacherHighlights.length > 0 && (
+            <div className="bg-surface-container-low rounded-[1.75rem] p-5 sm:p-6 border border-outline-variant/10">
+              <div className="text-sm font-black uppercase tracking-widest text-primary">Teacher content</div>
+              <div className="mt-4 space-y-3">
+                {teacherHighlights.map((item) => (
+                  <div key={item.id} className="rounded-[1.25rem] p-4 bg-surface-container-lowest">
+                    <div className="text-xs font-black uppercase tracking-widest text-primary">{item.contentType}</div>
+                    <div className="mt-2 font-bold text-on-surface">{item.title}</div>
+                    <div className="mt-2 text-sm text-on-surface-variant">{item.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       </main>
 
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(25,27,35,0.06)] rounded-t-[2.5rem] border-t border-outline-variant/10">
+      <nav className="bottom-safe-nav fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-3 sm:px-4 pt-3 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(25,27,35,0.06)] rounded-t-[2.5rem] border-t border-outline-variant/10">
         <NavItem icon={<Home className="w-6 h-6" />} label={t({ uz: 'Asosiy', en: 'Home', ru: 'Главная' })} onClick={() => navigate('/dashboard')} />
         <NavItem icon={<BookOpen className="w-6 h-6" />} label={t({ uz: 'Darslar', en: 'Lessons', ru: 'Уроки' })} active onClick={() => navigate('/lessons')} />
         <NavItem icon={<Dumbbell className="w-6 h-6" />} label={t({ uz: 'Mashqlar', en: 'Practice', ru: 'Практика' })} onClick={() => navigate('/practice')} />
@@ -422,12 +457,12 @@ function NavItem({
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center px-5 py-2 transition-all duration-150 ease-out ${
+      className={`flex min-w-[68px] flex-col items-center justify-center px-3 py-2 transition-all duration-150 ease-out ${
         active ? 'bg-secondary-container text-white rounded-full scale-105' : 'text-on-surface opacity-50 hover:scale-110'
       }`}
     >
       {icon}
-      <span className="text-[11px] font-medium tracking-wide mt-1">{label}</span>
+      <span className="text-[11px] font-medium tracking-wide mt-1 whitespace-nowrap">{label}</span>
     </button>
   );
 }

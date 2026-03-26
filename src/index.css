@@ -73,6 +73,34 @@
       background-color 180ms ease,
       color 180ms ease;
   }
+
+  body,
+  #root {
+    min-height: 100dvh;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
 .glass-nav {
@@ -81,6 +109,18 @@
   border-bottom: 1px solid var(--color-surface-container);
 }
 
+.bottom-safe-nav {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+.fab-safe {
+  bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
 }

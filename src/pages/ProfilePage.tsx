@@ -4,7 +4,9 @@ import {
   ArrowLeft,
   Award,
   Bell,
+  BookOpen,
   ChevronRight,
+  Gift,
   HelpCircle,
   History,
   LogOut,
@@ -14,13 +16,11 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getCompletedLessonCount, getLearnedWordCount } from '../lib/localData';
-import { useTranslateText } from '../lib/i18n';
+import { getCompletedLessonCount, getLearnedWordCount, getReferralCode } from '../lib/localData';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, logout, settings } = useAuth();
-  const t = useTranslateText();
 
   if (!user) {
     return null;
@@ -28,22 +28,24 @@ export default function ProfilePage() {
 
   const learnedCount = getLearnedWordCount(user.id);
   const completedLessons = getCompletedLessonCount(user.id);
+  const referralCode = getReferralCode(user);
 
   return (
-    <div className="bg-background min-h-screen pb-32">
+    <div className="bg-background min-h-screen pb-12">
       <header className="bg-background sticky top-0 z-40 glass-nav">
-        <div className="flex items-center gap-3 px-6 py-4">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-surface-container rounded-full transition-colors">
+        <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 -ml-2 hover:bg-surface-container rounded-full transition-colors"
+          >
             <ArrowLeft className="w-6 h-6 text-on-surface" />
           </button>
-          <span className="text-xl font-extrabold text-primary font-headline">
-            {t({ uz: 'Profil', en: 'Profile', ru: 'Профиль' })}
-          </span>
+          <span className="text-xl font-extrabold text-primary font-headline">Profile</span>
         </div>
       </header>
 
-      <main className="px-6 space-y-8 max-w-3xl mx-auto mt-6">
-        <section className="bg-surface-container-lowest rounded-[2rem] p-8 border border-outline-variant/10 shadow-sm text-center space-y-5">
+      <main className="px-4 mt-6 space-y-6 max-w-4xl mx-auto sm:px-6">
+        <section className="bg-surface-container-lowest rounded-[2rem] p-6 sm:p-8 border border-outline-variant/10 shadow-sm text-center space-y-5">
           {user.avatarUrl ? (
             <img
               src={user.avatarUrl}
@@ -57,43 +59,79 @@ export default function ProfilePage() {
           )}
           <div>
             <h1 className="text-2xl font-black text-on-surface">{user.name}</h1>
-            <p className="text-on-surface-variant">{user.email}</p>
+            <p className="text-on-surface-variant break-all">{user.email}</p>
+            <div className="mt-2 inline-flex px-3 py-1 rounded-full bg-primary/10 text-primary text-xs uppercase tracking-widest font-black">
+              {user.role}
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
             <StatCard label="XP" value={user.xp} />
-            <StatCard label={t({ uz: 'Level', en: 'Level', ru: 'Level' })} value={user.level} />
-            <StatCard label={t({ uz: 'Dars', en: 'Lessons', ru: 'Уроки' })} value={completedLessons} />
-            <StatCard label={t({ uz: 'So‘z', en: 'Words', ru: 'Слова' })} value={learnedCount} />
-            <StatCard label={t({ uz: 'Streak', en: 'Streak', ru: 'Серия' })} value={user.streak} />
+            <StatCard label="Level" value={user.level} />
+            <StatCard label="Lessons" value={completedLessons} />
+            <StatCard label="Words" value={learnedCount} />
+            <StatCard label="Streak" value={user.streak} />
           </div>
         </section>
 
-        <section className="space-y-4">
-          <h3 className="text-lg font-bold text-on-surface ml-1">
-            {t({ uz: 'Hisob sozlamalari', en: 'Account settings', ru: 'Настройки аккаунта' })}
-          </h3>
-          <div className="bg-surface-container-lowest rounded-[1.75rem] overflow-hidden shadow-sm border border-outline-variant/10">
-            <ProfileMenuItem icon={<User />} label={t({ uz: "Shaxsiy ma'lumotlar", en: 'Personal info', ru: 'Личные данные' })} onClick={() => navigate('/profile/personal-info')} />
-            <ProfileMenuItem icon={<Award />} label={t({ uz: 'Yutuqlar', en: 'Achievements', ru: 'Достижения' })} onClick={() => navigate('/profile/achievements')} />
-            <ProfileMenuItem icon={<History />} label={t({ uz: "O'rganish tarixi", en: 'Learning history', ru: 'История обучения' })} onClick={() => navigate('/profile/history')} />
-            <ProfileMenuItem icon={<Shield />} label={t({ uz: 'Xavfsizlik', en: 'Security', ru: 'Безопасность' })} onClick={() => navigate('/profile/security')} />
+        <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="bg-surface-container-lowest rounded-[2rem] p-5 sm:p-6 border border-outline-variant/10 shadow-sm">
+            <div className="text-sm font-black uppercase tracking-widest text-primary">Account settings</div>
+            <div className="mt-4 rounded-[1.5rem] overflow-hidden border border-outline-variant/10">
+              <ProfileMenuItem icon={<User />} label="Personal info" onClick={() => navigate('/profile/personal-info')} />
+              <ProfileMenuItem icon={<Award />} label="Achievements" onClick={() => navigate('/profile/achievements')} />
+              <ProfileMenuItem icon={<History />} label="Learning history" onClick={() => navigate('/profile/history')} />
+              <ProfileMenuItem icon={<Shield />} label="Security" onClick={() => navigate('/profile/security')} />
+            </div>
+          </div>
+
+          <div className="bg-surface-container-lowest rounded-[2rem] p-5 sm:p-6 border border-outline-variant/10 shadow-sm">
+            <div className="text-sm font-black uppercase tracking-widest text-primary">App settings</div>
+            <div className="mt-4 rounded-[1.5rem] overflow-hidden border border-outline-variant/10">
+              <ProfileMenuItem
+                icon={<Settings />}
+                label="Language, theme, and interface"
+                detail={`${settings.language.toUpperCase()} | ${settings.theme} | ${settings.preferredVoice}`}
+                onClick={() => navigate('/profile/language')}
+              />
+              <ProfileMenuItem
+                icon={<Mic />}
+                label="Voice profile"
+                detail={settings.preferredVoice}
+                onClick={() => navigate('/profile/language')}
+              />
+              <ProfileMenuItem icon={<Bell />} label="Notifications" onClick={() => navigate('/profile/notifications')} />
+              {user.role === 'teacher' && (
+                <ProfileMenuItem icon={<BookOpen />} label="Teacher dashboard" onClick={() => navigate('/teacher')} />
+              )}
+              <ProfileMenuItem icon={<HelpCircle />} label="Help center" onClick={() => navigate('/profile/help')} />
+            </div>
           </div>
         </section>
 
-        <section className="space-y-4">
-          <h3 className="text-lg font-bold text-on-surface ml-1">
-            {t({ uz: 'Ilova sozlamalari', en: 'App settings', ru: 'Настройки приложения' })}
-          </h3>
-          <div className="bg-surface-container-lowest rounded-[1.75rem] overflow-hidden shadow-sm border border-outline-variant/10">
-            <ProfileMenuItem
-              icon={<Settings />}
-              label={t({ uz: 'Til, mavzu va interfeys', en: 'Language, theme, and interface', ru: 'Язык, тема и интерфейс' })}
-              detail={`${settings.language.toUpperCase()} • ${settings.theme} • ${settings.preferredVoice}`}
-              onClick={() => navigate('/profile/language')}
-            />
-            <ProfileMenuItem icon={<Mic />} label={t({ uz: 'Ovoz profili', en: 'Voice profile', ru: 'Голосовой профиль' })} detail={settings.preferredVoice} onClick={() => navigate('/profile/language')} />
-            <ProfileMenuItem icon={<Bell />} label={t({ uz: 'Bildirishnomalar', en: 'Notifications', ru: 'Уведомления' })} onClick={() => navigate('/profile/notifications')} />
-            <ProfileMenuItem icon={<HelpCircle />} label={t({ uz: 'Yordam markazi', en: 'Help center', ru: 'Центр помощи' })} onClick={() => navigate('/profile/help')} />
+        <section className="grid gap-4 md:grid-cols-2">
+          <div className="bg-surface-container-lowest rounded-[2rem] p-5 sm:p-6 border border-outline-variant/10 shadow-sm">
+            <div className="text-sm font-black uppercase tracking-widest text-primary">Referral</div>
+            <div className="mt-3 text-2xl font-extrabold text-on-surface break-words">{referralCode.toUpperCase()}</div>
+            <div className="mt-2 text-sm text-on-surface-variant leading-6">
+              Share your invite link and bring a friend into the Sora AI path.
+            </div>
+            <button
+              onClick={() => navigate('/referral')}
+              className="mt-4 w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-primary text-white font-bold inline-flex items-center justify-center gap-2"
+            >
+              <Gift className="w-4 h-4" />
+              Open invite page
+            </button>
+          </div>
+
+          <div className="bg-surface-container-lowest rounded-[2rem] p-5 sm:p-6 border border-outline-variant/10 shadow-sm">
+            <div className="text-sm font-black uppercase tracking-widest text-primary">Current setup</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <SetupCard title="Theme" value={settings.theme} />
+              <SetupCard title="Language" value={settings.language.toUpperCase()} />
+              <SetupCard title="Voice" value={settings.preferredVoice} />
+              <SetupCard title="Track" value={`${user.level} path`} />
+            </div>
           </div>
         </section>
 
@@ -102,10 +140,10 @@ export default function ProfilePage() {
             logout();
             navigate('/login');
           }}
-          className="w-full flex items-center justify-center gap-2 p-5 bg-error/10 text-error rounded-2xl font-bold hover:bg-error/15 transition-colors"
+          className="w-full flex items-center justify-center gap-2 p-5 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-colors"
         >
           <LogOut className="w-6 h-6" />
-          <span>{t({ uz: 'Tizimdan chiqish', en: 'Log out', ru: 'Выйти' })}</span>
+          <span>Log out</span>
         </button>
       </main>
     </div>
@@ -117,6 +155,15 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     <div className="bg-surface-container-low p-4 rounded-2xl text-center border border-outline-variant/5">
       <div className="text-xl font-black text-primary">{value}</div>
       <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">{label}</div>
+    </div>
+  );
+}
+
+function SetupCard({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-[1.25rem] bg-surface-container-low p-4 border border-outline-variant/10">
+      <div className="text-[11px] font-black uppercase tracking-widest text-primary">{title}</div>
+      <div className="mt-2 font-bold text-on-surface break-words">{value}</div>
     </div>
   );
 }
@@ -135,14 +182,14 @@ function ProfileMenuItem({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-4 p-5 hover:bg-surface-container-low transition-colors border-b border-outline-variant/5 last:border-0"
+      className="w-full flex items-center gap-4 p-4 sm:p-5 hover:bg-surface-container-low transition-colors border-b border-outline-variant/5 last:border-0"
     >
-      <div className="text-primary">{icon}</div>
-      <div className="flex-1 text-left">
+      <div className="text-primary shrink-0">{icon}</div>
+      <div className="flex-1 text-left min-w-0">
         <div className="font-bold text-on-surface">{label}</div>
-        {detail && <div className="text-xs text-on-surface-variant mt-0.5">{detail}</div>}
+        {detail && <div className="text-xs text-on-surface-variant mt-0.5 break-words">{detail}</div>}
       </div>
-      <ChevronRight className="text-outline w-5 h-5" />
+      <ChevronRight className="text-outline w-5 h-5 shrink-0" />
     </button>
   );
 }

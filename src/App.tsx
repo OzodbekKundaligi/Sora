@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
@@ -12,6 +12,9 @@ import ChatPage from './pages/ChatPage';
 import PracticePage from './pages/PracticePage';
 import ProfilePage from './pages/ProfilePage';
 import LessonsPage from './pages/LessonsPage';
+import PlacementTestPage from './pages/PlacementTestPage';
+import TeacherDashboardPage from './pages/TeacherDashboardPage';
+import ReferralPage from './pages/ReferralPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import PersonalInfo from './pages/profile/PersonalInfo';
@@ -21,13 +24,23 @@ import Security from './pages/profile/Security';
 import Notifications from './pages/profile/Notifications';
 import LanguageSettings from './pages/profile/LanguageSettings';
 import HelpCenter from './pages/profile/HelpCenter';
+import { getPlacementTestResult } from './lib/localData';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { token, loading } = useAuth();
-  
+  const { token, loading, user } = useAuth();
+  const location = useLocation();
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>;
   if (!token) return <Navigate to="/login" />;
-  
+  if (
+    user
+    && user.role !== 'teacher'
+    && !getPlacementTestResult(user.id)
+    && location.pathname !== '/placement-test'
+  ) {
+    return <Navigate to="/placement-test" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -59,6 +72,21 @@ export default function App() {
           <Route path="/practice" element={
             <ProtectedRoute>
               <PracticePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/placement-test" element={
+            <ProtectedRoute>
+              <PlacementTestPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/teacher" element={
+            <ProtectedRoute>
+              <TeacherDashboardPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/referral" element={
+            <ProtectedRoute>
+              <ReferralPage />
             </ProtectedRoute>
           } />
           <Route path="/profile" element={

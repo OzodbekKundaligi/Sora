@@ -30,6 +30,7 @@ import {
   addListeningSubmission,
   addMockAttempt,
   addXp,
+  completeDailyMissionItem,
   getUserData,
   updateUserData,
 } from '../lib/localData';
@@ -121,6 +122,8 @@ export default function PracticePage() {
   const [listeningAnswer, setListeningAnswer] = useState('');
   const [listeningChecked, setListeningChecked] = useState(false);
   const [listeningResult, setListeningResult] = useState<{ correct: boolean; score: number; feedback: string } | null>(null);
+  const [transcriptUnlocked, setTranscriptUnlocked] = useState(false);
+  const [shadowingRepetitions, setShadowingRepetitions] = useState(0);
   const [selectedRoleplayId, setSelectedRoleplayId] = useState(routeState.roleplayId || '');
   const [roleplayMessages, setRoleplayMessages] = useState<Array<{ speaker: 'ai' | 'user' | 'coach'; text: string }>>([]);
   const [roleplayInput, setRoleplayInput] = useState('');
@@ -253,6 +256,8 @@ export default function PracticePage() {
       setListeningAnswer('');
       setListeningChecked(false);
       setListeningResult(null);
+      setTranscriptUnlocked(false);
+      setShadowingRepetitions(0);
       setIsLoading(false);
     }
     if (tab === 'roleplay') {
@@ -377,6 +382,7 @@ export default function PracticePage() {
     setIsChecked(true);
     const referenceWord = exercise?.word || exercise?.correctWord || currentWord || selectedTopicId;
     updatePracticeMeta(referenceWord, correct);
+    completeDailyMissionItem(user.id, exercise?.topicId ? 'daily-grammar' : 'daily-srs');
     loadPronunciationTarget(referenceWord);
   }
 
@@ -438,6 +444,7 @@ export default function PracticePage() {
       score: evaluation.score,
       feedback: evaluation.feedback,
     });
+    completeDailyMissionItem(user.id, 'daily-writing');
     grantXp(Math.max(18, Math.round(evaluation.score / 3)));
     setIsSubmittingWriting(false);
   }
@@ -464,12 +471,14 @@ export default function PracticePage() {
     const result = evaluateListeningAnswer(activeListeningLesson, listeningAnswer);
     setListeningChecked(true);
     setListeningResult(result);
+    setTranscriptUnlocked(true);
     addListeningSubmission(user.id, {
       lessonId: activeListeningLesson.id,
       title: activeListeningLesson.title[settings.language],
       level: activeListeningLesson.level,
       score: result.score,
     });
+    completeDailyMissionItem(user.id, 'daily-listening');
     grantXp(result.correct ? 24 : 10);
   }
 
@@ -487,6 +496,9 @@ export default function PracticePage() {
     setRoleplayInput('');
     setRoleplayTurn((current) => current + 1);
     setRoleplayResult(result);
+    if (result.finished) {
+      completeDailyMissionItem(user.id, 'daily-roleplay');
+    }
     grantXp(result.finished ? 28 : 14);
   }
 
@@ -518,6 +530,7 @@ export default function PracticePage() {
       score: result.score,
       band: result.band,
     });
+    completeDailyMissionItem(user.id, 'daily-mock');
     grantXp(Math.max(30, Math.round(result.score / 2)));
   }
 
@@ -534,9 +547,9 @@ export default function PracticePage() {
     listeningSpeed === 'slow' ? 0.78 : listeningSpeed === 'fast' ? 1.18 : 1;
 
   return (
-    <div className="bg-background min-h-screen flex flex-col max-w-6xl mx-auto pb-32">
+    <div className="bg-background min-h-screen flex flex-col max-w-6xl mx-auto pb-36">
       <header className="bg-background sticky top-0 z-50 glass-nav">
-        <div className="flex justify-between items-center px-6 py-4">
+        <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-surface-container rounded-full transition-colors">
               <ArrowLeft className="w-6 h-6 text-on-surface" />
@@ -546,7 +559,7 @@ export default function PracticePage() {
               <div className="text-xs uppercase tracking-widest font-bold text-on-surface-variant">A0 to IELTS practice</div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
             <TabButton active={tab === 'vocabulary'} onClick={() => setTab('vocabulary')} label={t({ uz: "Lug'at", en: 'Vocabulary', ru: 'Словарь' })} />
             <TabButton active={tab === 'grammar'} onClick={() => setTab('grammar')} label="Grammar" />
             <TabButton active={tab === 'pronunciation'} onClick={() => setTab('pronunciation')} label="Speaking" />
@@ -559,7 +572,7 @@ export default function PracticePage() {
         </div>
       </header>
 
-      <main className="px-6 pt-6 grid gap-6 lg:grid-cols-[1fr_0.95fr] flex-1">
+      <main className="px-4 pt-6 grid gap-6 lg:grid-cols-[1fr_0.95fr] flex-1 sm:px-6">
         <section className="space-y-6">
           {tab === 'vocabulary' && (
             <>
@@ -723,7 +736,7 @@ export default function PracticePage() {
                 stats={[
                   { label: 'Level', value: activeListeningLesson.level },
                   { label: 'Speed', value: listeningSpeed },
-                  { label: 'Focus', value: activeListeningLesson.focus[settings.language] },
+                  { label: 'Shadowing', value: `${shadowingRepetitions}/3 reps` },
                 ]}
               />
               <div className="bg-surface-container-lowest rounded-[2rem] p-6 border border-outline-variant/10 shadow-sm space-y-5">
@@ -760,12 +773,14 @@ export default function PracticePage() {
                         selectedListeningId || activeListeningLesson.id,
                         unlockedListeningLessons,
                         setSelectedListeningId,
-                        () => {
-                          setListeningAnswer('');
-                          setListeningChecked(false);
-                          setListeningResult(null);
-                        },
-                      );
+                         () => {
+                           setListeningAnswer('');
+                           setListeningChecked(false);
+                           setListeningResult(null);
+                           setTranscriptUnlocked(false);
+                           setShadowingRepetitions(0);
+                         },
+                       );
                     }}
                     className="px-5 py-3 rounded-2xl font-bold bg-surface-container-low text-on-surface flex items-center gap-2"
                   >
@@ -778,6 +793,8 @@ export default function PracticePage() {
                       setListeningAnswer('');
                       setListeningChecked(false);
                       setListeningResult(null);
+                      setTranscriptUnlocked(false);
+                      setShadowingRepetitions(0);
                     }}
                     className="px-5 py-3 rounded-2xl font-bold bg-surface-container-low text-on-surface flex items-center gap-2"
                   >
@@ -816,6 +833,18 @@ export default function PracticePage() {
                   >
                     Check listening
                   </button>
+                  <button
+                    onClick={() => setTranscriptUnlocked(true)}
+                    disabled={!listeningChecked && !listeningResult}
+                    className={cn(
+                      'px-6 py-3.5 rounded-2xl font-bold',
+                      !listeningChecked && !listeningResult
+                        ? 'bg-outline/30 text-white'
+                        : 'bg-surface-container-low text-on-surface',
+                    )}
+                  >
+                    Unlock transcript
+                  </button>
                 </ActionRow>
                 {listeningResult && (
                   <div className={`rounded-[1.5rem] p-5 border ${listeningResult.correct ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
@@ -823,6 +852,63 @@ export default function PracticePage() {
                     <div className="mt-2 text-sm">{listeningResult.feedback}</div>
                   </div>
                 )}
+                {transcriptUnlocked && (
+                  <div className="rounded-[1.5rem] bg-primary/5 p-5 border border-primary/10">
+                    <div className="text-sm font-black uppercase tracking-widest text-primary">Transcript</div>
+                    <div className="mt-2 text-on-surface leading-7">{activeListeningLesson.transcript}</div>
+                  </div>
+                )}
+                <div className="rounded-[1.5rem] bg-surface-container-low p-5 border border-outline-variant/10">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-sm font-black uppercase tracking-widest text-primary">Shadowing mode</div>
+                      <div className="mt-2 text-sm text-on-surface-variant leading-6">
+                        1. Listen once. 2. Unlock transcript. 3. Repeat the line 3 times with the same rhythm.
+                      </div>
+                    </div>
+                    <div className="rounded-2xl bg-surface-container-lowest px-4 py-3 text-sm font-black text-on-surface">
+                      {shadowingRepetitions}/3 reps
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className={`rounded-[1.25rem] p-4 border ${listeningChecked ? 'bg-green-50 border-green-200 text-green-700' : 'bg-surface-container-lowest border-outline-variant/10 text-on-surface-variant'}`}>
+                      Check the listening answer first.
+                    </div>
+                    <div className={`rounded-[1.25rem] p-4 border ${transcriptUnlocked ? 'bg-green-50 border-green-200 text-green-700' : 'bg-surface-container-lowest border-outline-variant/10 text-on-surface-variant'}`}>
+                      Unlock the transcript for line-by-line imitation.
+                    </div>
+                    <div className={`rounded-[1.25rem] p-4 border ${shadowingRepetitions >= 3 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-surface-container-lowest border-outline-variant/10 text-on-surface-variant'}`}>
+                      Repeat until you reach 3 shadowing reps.
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      onClick={() => playPronunciation(activeListeningLesson.transcript, settings.preferredVoice, listeningRate)}
+                      className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-primary text-white font-bold inline-flex items-center justify-center gap-2"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                      Shadowing replay
+                    </button>
+                    <button
+                      onClick={() => setShadowingRepetitions((current) => Math.min(current + 1, 3))}
+                      disabled={!transcriptUnlocked}
+                      className={cn(
+                        'w-full sm:w-auto px-5 py-3 rounded-2xl font-bold inline-flex items-center justify-center gap-2',
+                        !transcriptUnlocked
+                          ? 'bg-outline/30 text-white'
+                          : 'bg-secondary-container text-white',
+                      )}
+                    >
+                      Mark one rep done
+                    </button>
+                    <button
+                      onClick={() => setShadowingRepetitions(0)}
+                      className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-surface-container-lowest text-on-surface font-bold border border-outline-variant/10"
+                    >
+                      Reset reps
+                    </button>
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -1149,11 +1235,25 @@ export default function PracticePage() {
                   <div className="grid sm:grid-cols-3 gap-4">
                     <MetricCard label="Score" value={`${writingEvaluation.score}%`} />
                     <MetricCard label="Words" value={`${writingEvaluation.wordCount}`} />
-                    <MetricCard label="Level" value={activeWritingPrompt.level} />
+                    <MetricCard label="Band" value={writingEvaluation.bandEstimate} />
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <FeedbackList title="Strengths" items={writingEvaluation.strengths} accent="green" />
                     <FeedbackList title="What to fix" items={writingEvaluation.feedback} accent="amber" />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-[1.5rem] bg-surface-container-low p-5 border border-outline-variant/10">
+                      <div className="text-sm font-black uppercase tracking-widest text-primary">Corrected version</div>
+                      <div className="mt-3 text-on-surface leading-7 whitespace-pre-wrap">
+                        {writingEvaluation.correctedSample}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] bg-surface-container-low p-5 border border-outline-variant/10">
+                      <div className="text-sm font-black uppercase tracking-widest text-primary">Stronger rewrite</div>
+                      <div className="mt-3 text-on-surface leading-7 whitespace-pre-wrap">
+                        {writingEvaluation.strongerRewrite}
+                      </div>
+                    </div>
                   </div>
                   <div className="rounded-[1.5rem] bg-primary/5 p-5 border border-primary/10">
                     <div className="text-sm font-black uppercase tracking-widest text-primary">Next task</div>
@@ -1470,7 +1570,7 @@ export default function PracticePage() {
         </section>
       </main>
 
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(25,27,35,0.06)] rounded-t-[2.5rem] border-t border-outline-variant/10">
+      <nav className="bottom-safe-nav fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-3 sm:px-4 pt-3 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_24px_rgba(25,27,35,0.06)] rounded-t-[2.5rem] border-t border-outline-variant/10">
         <NavItem icon={<Home className="w-6 h-6" />} label={t({ uz: 'Asosiy', en: 'Home', ru: 'Главная' })} onClick={() => navigate('/dashboard')} />
         <NavItem icon={<BookOpen className="w-6 h-6" />} label={t({ uz: 'Darslar', en: 'Lessons', ru: 'Уроки' })} onClick={() => navigate('/lessons')} />
         <NavItem icon={<Dumbbell className="w-6 h-6" />} label={t({ uz: 'Mashqlar', en: 'Practice', ru: 'Практика' })} active onClick={() => navigate('/practice')} />
@@ -1490,18 +1590,18 @@ function HeroCard({
   stats: Array<{ label: string; value: string | number }>;
 }) {
   return (
-    <div className="rounded-[2rem] p-6 bg-gradient-to-br from-primary to-primary-container text-white shadow-2xl shadow-primary/15">
+    <div className="rounded-[2rem] p-5 sm:p-6 bg-gradient-to-br from-primary to-primary-container text-white shadow-2xl shadow-primary/15">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-xs font-black uppercase tracking-widest opacity-80">Sora AI</div>
           <h2 className="mt-2 text-2xl font-extrabold">{title}</h2>
           <p className="mt-3 text-white/85 max-w-2xl">{description}</p>
         </div>
-        <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">
+        <div className="hidden sm:flex w-14 h-14 rounded-2xl bg-white/15 items-center justify-center">
           <Sparkles className="w-7 h-7" />
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3 mt-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-2xl bg-white/10 p-4">
             <div className="text-xs uppercase tracking-widest font-black text-white/70">{stat.label}</div>
@@ -1515,7 +1615,7 @@ function HeroCard({
 
 function TabButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick} className={cn('px-3 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all', active ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant')}>
+    <button onClick={onClick} className={cn('shrink-0 whitespace-nowrap px-3 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all', active ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant')}>
       {label}
     </button>
   );
@@ -1539,7 +1639,7 @@ function LoadingBlock({ text }: { text: string }) {
 }
 
 function ActionRow({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-3">{children}</div>;
+  return <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">{children}</div>;
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
@@ -1776,9 +1876,9 @@ function NavItem({
   onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} className={cn('flex flex-col items-center justify-center px-5 py-2 transition-all duration-150 ease-out', active ? 'bg-secondary-container text-white rounded-full scale-105' : 'text-on-surface opacity-50 hover:scale-110')}>
+    <button onClick={onClick} className={cn('flex min-w-[68px] flex-col items-center justify-center px-3 py-2 transition-all duration-150 ease-out', active ? 'bg-secondary-container text-white rounded-full scale-105' : 'text-on-surface opacity-50 hover:scale-105')}>
       {icon}
-      <span className="text-[11px] font-medium tracking-wide mt-1">{label}</span>
+      <span className="text-[11px] font-medium tracking-wide mt-1 whitespace-nowrap">{label}</span>
     </button>
   );
 }

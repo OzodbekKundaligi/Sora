@@ -1,6 +1,7 @@
 export type AppLanguage = 'uz' | 'en' | 'ru';
 export type AppTheme = 'light' | 'dark';
 export type PreferredVoice = 'Zephyr' | 'Kore' | 'Fenrir' | 'Puck' | 'Charon' | 'Ozodbek';
+export type UserRole = 'student' | 'teacher';
 
 export interface User {
   id: number;
@@ -10,6 +11,7 @@ export interface User {
   level: string;
   streak: number;
   avatarUrl?: string;
+  role: UserRole;
 }
 
 interface StoredUser extends User {
@@ -100,6 +102,29 @@ export interface MockAttempt {
   completedAt: string;
 }
 
+export interface PlacementTestResult {
+  score: number;
+  level: string;
+  recommendedFocus: string[];
+  completedAt: string;
+}
+
+export interface DailyMissionRecord {
+  date: string;
+  completedIds: string[];
+}
+
+export interface TeacherContentItem {
+  id: string;
+  title: string;
+  description: string;
+  level: string;
+  contentType: 'lesson' | 'quiz' | 'listening' | 'writing' | 'speaking';
+  body: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface UserData {
   settings: Settings;
   messages: StoredMessage[];
@@ -111,6 +136,9 @@ export interface UserData {
   writingSubmissions: WritingSubmission[];
   listeningSubmissions: ListeningSubmission[];
   mockAttempts: MockAttempt[];
+  placementTest: PlacementTestResult | null;
+  achievements: string[];
+  dailyMissionRecords: DailyMissionRecord[];
 }
 
 interface Session {
@@ -121,6 +149,7 @@ interface Session {
 const USERS_KEY = 'sora_local_users_v2';
 const SESSION_KEY = 'sora_local_session_v2';
 const GUEST_SETTINGS_KEY = 'sora_guest_settings_v2';
+const TEACHER_CONTENT_KEY = 'sora_teacher_content_v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   language: 'uz',
@@ -217,6 +246,7 @@ function toPublicUser(user: StoredUser): User {
     level: user.level,
     streak: user.streak,
     avatarUrl: user.avatarUrl,
+    role: user.role || 'student',
   };
 }
 
@@ -232,7 +262,14 @@ function createEmptyUserData(): UserData {
     writingSubmissions: [],
     listeningSubmissions: [],
     mockAttempts: [],
+    placementTest: null,
+    achievements: [],
+    dailyMissionRecords: [],
   };
+}
+
+function resolveRole(email: string): UserRole {
+  return /admin|teacher|ustoz/i.test(email) ? 'teacher' : 'student';
 }
 
 export function getStoredUsers() {
@@ -346,6 +383,7 @@ export function registerLocalUser({
     level: 'A0',
     streak: 0,
     avatarUrl: '',
+    role: resolveRole(normalizedEmail),
     createdAt: now,
     lastActiveAt: now,
     lastStreakDate: '',
@@ -470,6 +508,105 @@ export function updateUserSettings(userId: number | null, settings: Partial<Sett
       ...settings,
     },
   })).settings;
+}
+
+export function getPlacementTestResult(userId: number) {
+  return getUserData(userId).placementTest;
+}
+
+export function savePlacementTestResult(userId: number, result: PlacementTestResult) {
+  const users = getStoredUsers();
+  const index = users.findIndex((user) => user.id === userId);
+
+  if (index !== -1) {
+    users[index] = {
+      ...users[index],
+      level: result.level,
+      xp: Math.max(users[index].xp, result.score),
+    };
+    saveStoredUsers(users);
+  }
+
+  updateUserData(userId, (data) => ({
+    ...data,
+    placementTest: result,
+  }));
+
+  return getUserById(userId);
+}
+
+export function getDailyMissionRecord(userId: number, date = getTodayKey()) {
+  return getUserData(userId).dailyMissionRecords.find((entry) => entry.date === date) || null;
+}
+
+export function completeDailyMissionItem(userId: number, missionId: string, date = getTodayKey()) {
+  return updateUserData(userId, (data) => {
+    const existing = data.dailyMissionRecords.find((entry) => entry.date === date);
+    if (existing) {
+      return {
+        ...data,
+        dailyMissionRecords: data.dailyMissionRecords.map((entry) =>
+          entry.date === date
+            ? {
+                ...entry,
+                completedIds: entry.completedIds.includes(missionId)
+                  ? entry.completedIds
+                  : [...entry.completedIds, missionId],
+              }
+            : entry,
+        ),
+      };
+    }
+
+    return {
+      ...data,
+      dailyMissionRecords: [
+        ...data.dailyMissionRecords,
+        {
+          date,
+          completedIds: [missionId],
+        },
+      ],
+    };
+  }).dailyMissionRecords;
+}
+
+export function unlockAchievement(userId: number, achievementId: string) {
+  return updateUserData(userId, (data) => ({
+    ...data,
+    achievements: data.achievements.includes(achievementId)
+      ? data.achievements
+      : [...data.achievements, achievementId],
+  })).achievements;
+}
+
+export function getTeacherContent() {
+  return readJSON<TeacherContentItem[]>(TEACHER_CONTENT_KEY, []);
+}
+
+export function addTeacherContent(
+  item: Omit<TeacherContentItem, 'id' | 'createdAt'>,
+) {
+  const nextItem: TeacherContentItem = {
+    ...item,
+    id: createId(),
+    createdAt: new Date().toISOString(),
+  };
+
+  const items = [nextItem, ...getTeacherContent()];
+  writeJSON(TEACHER_CONTENT_KEY, items);
+  return nextItem;
+}
+
+export function removeTeacherContent(itemId: string) {
+  const next = getTeacherContent().filter((item) => item.id !== itemId);
+  writeJSON(TEACHER_CONTENT_KEY, next);
+  return next;
+}
+
+export function getReferralCode(user: Pick<User, 'id' | 'name'>) {
+  const cleaned = user.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6) || 'sora';
+  return `${cleaned}-${String(user.id).slice(-4)}`;
 }
 
 export function getUserMessages(userId: number) {
