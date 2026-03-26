@@ -30,7 +30,18 @@ export interface DailyPlanItem {
   title: LocalizedText;
   description: LocalizedText;
   minutes: number;
-  route: '/lessons' | '/practice' | '/chat';
+  route:
+    | '/lessons'
+    | '/practice'
+    | '/practice/vocabulary'
+    | '/practice/grammar'
+    | '/practice/speaking'
+    | '/practice/listening'
+    | '/practice/roleplay'
+    | '/practice/reading'
+    | '/practice/writing'
+    | '/practice/mock'
+    | '/chat';
   routeState?: Record<string, unknown>;
 }
 
@@ -419,32 +430,31 @@ export function getDailyPlan(userId: number, level = 'A0'): DailyPlanItem[] {
         ru: `Review ${Math.max(dueWords, 4)} words`,
       },
       minutes: 4,
-      route: '/practice',
-      routeState: { tab: 'vocabulary' },
+      route: '/practice/vocabulary',
     },
     {
       id: 'daily-listening',
       title: { uz: 'Listening', en: 'Listening', ru: 'Listening' },
       description: listening.title,
       minutes: 4,
-      route: '/practice',
-      routeState: { tab: 'listening', lessonId: listening.id },
+      route: '/practice/listening',
+      routeState: { lessonId: listening.id },
     },
     {
       id: 'daily-writing',
       title: { uz: 'Writing', en: 'Writing', ru: 'Writing' },
       description: writing.title,
       minutes: 4,
-      route: '/practice',
-      routeState: { tab: 'writing', promptId: writing.id },
+      route: '/practice/writing',
+      routeState: { promptId: writing.id },
     },
     {
       id: 'daily-roleplay',
       title: { uz: 'Speaking roleplay', en: 'Speaking roleplay', ru: 'Speaking roleplay' },
       description: roleplay.title,
       minutes: 3,
-      route: '/practice',
-      routeState: { tab: 'roleplay', roleplayId: roleplay.id },
+      route: '/practice/roleplay',
+      routeState: { roleplayId: roleplay.id },
     },
   ];
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, Reorder } from 'motion/react';
 import {
   ArrowLeft,
@@ -67,6 +67,22 @@ type QuizFormat = 'multiple-choice' | 'fill-in-the-blanks' | 'matching';
 
 const grammarTopics = getGrammarTopics();
 const levelStages = ['A0', 'A1', 'A2', 'B1', 'B2', 'C1', 'IELTS'];
+const practiceTabs: PracticeTab[] = ['vocabulary', 'grammar', 'pronunciation', 'listening', 'roleplay', 'reading', 'writing', 'mock'];
+
+function routeSegmentToPracticeTab(segment?: string): PracticeTab | null {
+  if (!segment) return null;
+  const key = segment.trim().toLowerCase();
+  if (key === 'speaking') return 'pronunciation';
+  if (key === 'pronunciation') return 'pronunciation';
+  if (key === 'vocab') return 'vocabulary';
+  if (key === 'vocabulary') return 'vocabulary';
+  if (practiceTabs.includes(key as PracticeTab)) return key as PracticeTab;
+  return null;
+}
+
+function practiceTabToRouteSegment(tab: PracticeTab) {
+  return tab === 'pronunciation' ? 'speaking' : tab;
+}
 
 function cn(...inputs: Array<string | false | null | undefined>) {
   return inputs.filter(Boolean).join(' ');
@@ -80,6 +96,7 @@ function levelRank(level: string) {
 export default function PracticePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const params = useParams();
   const { user, settings, updateUser } = useAuth();
   const t = useTranslateText();
   const routeState = (location.state || {}) as {
@@ -91,7 +108,7 @@ export default function PracticePage() {
     lessonId?: string;
     roleplayId?: string;
   };
-  const [tab, setTab] = useState<PracticeTab>(routeState.tab || 'vocabulary');
+  const tab = routeSegmentToPracticeTab(params.tab) || routeState.tab || 'vocabulary';
   const [quizFormat, setQuizFormat] = useState<QuizFormat>('multiple-choice');
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [currentWord, setCurrentWord] = useState(routeState.word || '');
@@ -147,6 +164,15 @@ export default function PracticePage() {
     sectionScores: { listening: number; reading: number; writing: number; speaking: number };
   } | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Backward compatible: older navigation used location.state.tab.
+    // Turn it into a real URL (ex: /practice/roleplay).
+    if (params.tab) return;
+    if (!routeState.tab) return;
+    if (routeState.tab === 'vocabulary') return;
+    navigate(`/practice/${practiceTabToRouteSegment(routeState.tab)}`, { replace: true, state: location.state });
+  }, [location.state, navigate, params.tab, routeState.tab]);
 
   const stats = user
     ? (() => {
@@ -285,10 +311,8 @@ export default function PracticePage() {
     routeState.roleplayId,
     routeState.topicId,
     routeState.word,
-    stats?.suggestedTopic.id,
     tab,
     user?.id,
-    user?.level,
   ]);
 
   useEffect(() => {
@@ -560,14 +584,14 @@ export default function PracticePage() {
             </div>
           </div>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            <TabButton active={tab === 'vocabulary'} onClick={() => setTab('vocabulary')} label={t({ uz: "Lug'at", en: 'Vocabulary', ru: 'Словарь' })} />
-            <TabButton active={tab === 'grammar'} onClick={() => setTab('grammar')} label="Grammar" />
-            <TabButton active={tab === 'pronunciation'} onClick={() => setTab('pronunciation')} label="Speaking" />
-            <TabButton active={tab === 'listening'} onClick={() => setTab('listening')} label="Listening" />
-            <TabButton active={tab === 'roleplay'} onClick={() => setTab('roleplay')} label="Roleplay" />
-            <TabButton active={tab === 'reading'} onClick={() => setTab('reading')} label="Reading" />
-            <TabButton active={tab === 'writing'} onClick={() => setTab('writing')} label="Writing" />
-            <TabButton active={tab === 'mock'} onClick={() => setTab('mock')} label="Mock" />
+            <TabButton active={tab === 'vocabulary'} onClick={() => navigate('/practice/vocabulary')} label={t({ uz: "Lug'at", en: 'Vocabulary', ru: 'Словарь' })} />
+            <TabButton active={tab === 'grammar'} onClick={() => navigate('/practice/grammar')} label="Grammar" />
+            <TabButton active={tab === 'pronunciation'} onClick={() => navigate('/practice/speaking')} label="Speaking" />
+            <TabButton active={tab === 'listening'} onClick={() => navigate('/practice/listening')} label="Listening" />
+            <TabButton active={tab === 'roleplay'} onClick={() => navigate('/practice/roleplay')} label="Roleplay" />
+            <TabButton active={tab === 'reading'} onClick={() => navigate('/practice/reading')} label="Reading" />
+            <TabButton active={tab === 'writing'} onClick={() => navigate('/practice/writing')} label="Writing" />
+            <TabButton active={tab === 'mock'} onClick={() => navigate('/practice/mock')} label="Mock" />
           </div>
         </div>
       </header>

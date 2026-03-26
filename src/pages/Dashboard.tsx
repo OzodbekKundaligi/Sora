@@ -173,7 +173,7 @@ export default function Dashboard() {
               />
               <ActionButton
                 label="Speaking roleplay"
-                onClick={() => navigate('/practice', { state: { tab: 'roleplay' } })}
+                onClick={() => navigate('/practice/roleplay')}
                 subtle
               />
             </div>
@@ -225,19 +225,19 @@ export default function Dashboard() {
               icon={<BookOpen className="w-5 h-5" />}
               title="Vocabulary quizzes"
               desc={`${overview.srsStats.due} words are ready for SRS review today.`}
-              onClick={() => navigate('/practice', { state: { tab: 'vocabulary' } })}
+              onClick={() => navigate('/practice/vocabulary')}
             />
             <QuickCard
               icon={<Mic className="w-5 h-5" />}
               title="Listening lab"
               desc="Use slow, normal, or fast audio. Unlock transcript only after you check the answer."
-              onClick={() => navigate('/practice', { state: { tab: 'listening' } })}
+              onClick={() => navigate('/practice/listening')}
             />
             <QuickCard
               icon={<MessageSquare className="w-5 h-5" />}
               title="Speaking roleplay"
               desc="Practice real scenes with correction, score, retry, and a clear next target."
-              onClick={() => navigate('/practice', { state: { tab: 'roleplay' } })}
+              onClick={() => navigate('/practice/roleplay')}
             />
             <QuickCard
               icon={<Gift className="w-5 h-5" />}
@@ -348,7 +348,7 @@ export default function Dashboard() {
                 <div className="mt-2 text-on-surface-variant">{wordOfTheDay.translation}</div>
                 <div className="mt-4 text-sm text-on-surface-variant leading-6">{wordOfTheDay.example}</div>
                 <button
-                  onClick={() => navigate('/practice', { state: { tab: 'vocabulary', word: wordOfTheDay.word } })}
+                  onClick={() => navigate('/practice/vocabulary', { state: { word: wordOfTheDay.word } })}
                   className="mt-4 w-full sm:w-auto px-5 py-3 rounded-2xl bg-primary text-white font-bold"
                 >
                   Practice this word

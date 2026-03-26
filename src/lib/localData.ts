@@ -19,6 +19,9 @@ interface StoredUser extends User {
   createdAt: string;
   lastActiveAt: string;
   lastStreakDate: string;
+  referredBy?: string;
+  streakFreezeBalance?: number;
+  streakFreezeWeek?: string;
 }
 
 export interface Settings {
@@ -125,6 +128,23 @@ export interface TeacherContentItem {
   createdBy: string;
 }
 
+export type TeacherCourseKind = 'lesson' | 'quiz' | 'listening' | 'writing';
+export type TeacherCourseStatus = 'draft' | 'published';
+
+export interface TeacherCourseItem {
+  id: string;
+  kind: TeacherCourseKind;
+  status: TeacherCourseStatus;
+  level: string;
+  title: string;
+  description: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  data: Record<string, unknown>;
+}
+
 export interface UserData {
   settings: Settings;
   messages: StoredMessage[];
@@ -150,6 +170,7 @@ const USERS_KEY = 'sora_local_users_v2';
 const SESSION_KEY = 'sora_local_session_v2';
 const GUEST_SETTINGS_KEY = 'sora_guest_settings_v2';
 const TEACHER_CONTENT_KEY = 'sora_teacher_content_v1';
+const TEACHER_COURSE_KEY = 'sora_teacher_course_v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   language: 'uz',
@@ -208,6 +229,43 @@ function getYesterdayKey() {
   return yesterday.toISOString().slice(0, 10);
 }
 
+function isoWeekKey(date = new Date()) {
+  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  target.setUTCDate(target.getUTCDate() + 3 - ((target.getUTCDay() + 6) % 7));
+  const week1 = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const weekNumber =
+    1
+    + Math.round(
+      (
+        (target.getTime() - week1.getTime()) / 86400000
+        - 3
+        + ((week1.getUTCDay() + 6) % 7)
+      ) / 7,
+    );
+  return `${target.getUTCFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+}
+
+function diffDays(fromKey: string, toKey: string) {
+  const from = Date.parse(`${fromKey}T00:00:00Z`);
+  const to = Date.parse(`${toKey}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Math.round((to - from) / 86400000);
+}
+
+function ensureFreezeBalance(user: StoredUser) {
+  const currentWeek = isoWeekKey(new Date());
+  if (user.streakFreezeWeek !== currentWeek) {
+    user.streakFreezeWeek = currentWeek;
+    user.streakFreezeBalance = 1;
+  }
+
+  if (typeof user.streakFreezeBalance !== 'number') {
+    user.streakFreezeBalance = 1;
+  }
+}
+
 function resolveLevel(xp: number) {
   if (xp >= 3200) return 'IELTS';
   if (xp >= 2200) return 'C1';
@@ -220,6 +278,7 @@ function resolveLevel(xp: number) {
 
 function touchUserActivity(user: StoredUser) {
   const today = getTodayKey();
+  ensureFreezeBalance(user);
 
   if (user.lastStreakDate === today) {
     user.lastActiveAt = new Date().toISOString();
@@ -229,7 +288,13 @@ function touchUserActivity(user: StoredUser) {
   if (user.lastStreakDate === getYesterdayKey()) {
     user.streak += 1;
   } else {
-    user.streak = 1;
+    const gap = user.lastStreakDate ? diffDays(user.lastStreakDate, today) : Number.POSITIVE_INFINITY;
+    const canFreeze = gap === 2 && (user.streakFreezeBalance || 0) > 0;
+    if (canFreeze) {
+      user.streakFreezeBalance = Math.max(0, (user.streakFreezeBalance || 0) - 1);
+    } else {
+      user.streak = 1;
+    }
   }
 
   user.lastStreakDate = today;
@@ -361,10 +426,12 @@ export function registerLocalUser({
   email,
   password,
   name,
+  referredBy,
 }: {
   email: string;
   password: string;
   name: string;
+  referredBy?: string;
 }) {
   const normalizedEmail = email.trim().toLowerCase();
   const users = getStoredUsers();
@@ -384,6 +451,9 @@ export function registerLocalUser({
     streak: 0,
     avatarUrl: '',
     role: resolveRole(normalizedEmail),
+    referredBy: referredBy?.trim() || '',
+    streakFreezeBalance: 1,
+    streakFreezeWeek: isoWeekKey(new Date()),
     createdAt: now,
     lastActiveAt: now,
     lastStreakDate: '',
@@ -602,6 +672,92 @@ export function removeTeacherContent(itemId: string) {
   const next = getTeacherContent().filter((item) => item.id !== itemId);
   writeJSON(TEACHER_CONTENT_KEY, next);
   return next;
+}
+
+function normalizeCourseItems(items: TeacherCourseItem[]) {
+  return [...items]
+    .map((item, index) => ({
+      ...item,
+      order: Number.isFinite(item.order) ? item.order : index,
+      status: item.status || 'published',
+      updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+      createdAt: item.createdAt || new Date().toISOString(),
+      createdBy: item.createdBy || 'Teacher',
+      data: item.data || {},
+    }))
+    .sort((left, right) => left.order - right.order || left.createdAt.localeCompare(right.createdAt));
+}
+
+export function getTeacherCourseItems() {
+  return normalizeCourseItems(readJSON<TeacherCourseItem[]>(TEACHER_COURSE_KEY, []));
+}
+
+function saveTeacherCourseItems(items: TeacherCourseItem[]) {
+  writeJSON(TEACHER_COURSE_KEY, normalizeCourseItems(items));
+}
+
+export function addTeacherCourseItem(
+  item: Omit<TeacherCourseItem, 'id' | 'createdAt' | 'updatedAt' | 'order'> & Partial<Pick<TeacherCourseItem, 'order'>>,
+) {
+  const existing = getTeacherCourseItems();
+  const maxOrder = existing.reduce((max, entry) => Math.max(max, entry.order), 0);
+  const now = new Date().toISOString();
+  const nextItem: TeacherCourseItem = {
+    ...item,
+    id: createId(),
+    createdAt: now,
+    updatedAt: now,
+    order: typeof item.order === 'number' ? item.order : maxOrder + 1,
+    status: item.status || 'draft',
+    data: item.data || {},
+  };
+
+  const next = normalizeCourseItems([...existing, nextItem]);
+  saveTeacherCourseItems(next);
+  return nextItem;
+}
+
+export function updateTeacherCourseItem(
+  itemId: string,
+  updates: Partial<Omit<TeacherCourseItem, 'id' | 'createdAt' | 'createdBy'>>,
+) {
+  const now = new Date().toISOString();
+  const next = getTeacherCourseItems().map((item) =>
+    item.id === itemId
+      ? {
+          ...item,
+          ...updates,
+          data: updates.data ? { ...item.data, ...updates.data } : item.data,
+          updatedAt: now,
+        }
+      : item,
+  );
+  saveTeacherCourseItems(next);
+  return next;
+}
+
+export function removeTeacherCourseItem(itemId: string) {
+  const next = getTeacherCourseItems().filter((item) => item.id !== itemId);
+  saveTeacherCourseItems(next);
+  return next;
+}
+
+export function moveTeacherCourseItem(itemId: string, direction: 'up' | 'down') {
+  const items = getTeacherCourseItems();
+  const index = items.findIndex((item) => item.id === itemId);
+  if (index === -1) return items;
+
+  const swapIndex = direction === 'up' ? index - 1 : index + 1;
+  if (swapIndex < 0 || swapIndex >= items.length) return items;
+
+  const next = [...items];
+  const temp = next[index];
+  next[index] = next[swapIndex];
+  next[swapIndex] = temp;
+
+  const reOrdered = normalizeCourseItems(next.map((item, order) => ({ ...item, order })));
+  saveTeacherCourseItems(reOrdered);
+  return reOrdered;
 }
 
 export function getReferralCode(user: Pick<User, 'id' | 'name'>) {

@@ -45,7 +45,7 @@ export default function ProfilePage() {
       </header>
 
       <main className="px-4 mt-6 space-y-6 max-w-4xl mx-auto sm:px-6">
-        <section className="bg-surface-container-lowest rounded-[2rem] p-6 sm:p-8 border border-outline-variant/10 shadow-sm text-center space-y-5">
+        <section className="bg-surface-container-lowest rounded-4xl6 sm:p-8 border border-outline-variant/10 shadow-sm text-center space-y-5">
           {user.avatarUrl ? (
             <img
               src={user.avatarUrl}
@@ -74,9 +74,9 @@ export default function ProfilePage() {
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="bg-surface-container-lowest rounded-[2rem] p-5 sm:p-6 border border-outline-variant/10 shadow-sm">
+          <div className="bg-surface-container-lowest rounded-4xl p-5 sm:p-6 border border-outline-variant/10 shadow-sm">
             <div className="text-sm font-black uppercase tracking-widest text-primary">Account settings</div>
-            <div className="mt-4 rounded-[1.5rem] overflow-hidden border border-outline-variant/10">
+            <div className="mt-4 rounded-3xl overflow-hidden border border-outline-variant/10">
               <ProfileMenuItem icon={<User />} label="Personal info" onClick={() => navigate('/profile/personal-info')} />
               <ProfileMenuItem icon={<Award />} label="Achievements" onClick={() => navigate('/profile/achievements')} />
               <ProfileMenuItem icon={<History />} label="Learning history" onClick={() => navigate('/profile/history')} />

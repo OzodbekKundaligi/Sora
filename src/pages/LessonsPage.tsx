@@ -300,25 +300,25 @@ export default function LessonsPage() {
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <button
-                  onClick={() => navigate('/practice', { state: { tab: 'listening' } })}
+                  onClick={() => navigate('/practice/listening')}
                   className="rounded-2xl bg-surface-container-lowest p-4 text-left font-bold text-on-surface"
                 >
                   Listening
                 </button>
                 <button
-                  onClick={() => navigate('/practice', { state: { tab: 'reading' } })}
+                  onClick={() => navigate('/practice/reading')}
                   className="rounded-2xl bg-surface-container-lowest p-4 text-left font-bold text-on-surface"
                 >
                   Reading
                 </button>
                 <button
-                  onClick={() => navigate('/practice', { state: { tab: 'writing' } })}
+                  onClick={() => navigate('/practice/writing')}
                   className="rounded-2xl bg-surface-container-lowest p-4 text-left font-bold text-on-surface"
                 >
                   Writing
                 </button>
                 <button
-                  onClick={() => navigate('/practice', { state: { tab: 'roleplay' } })}
+                  onClick={() => navigate('/practice/roleplay')}
                   className="rounded-2xl bg-surface-container-lowest p-4 text-left font-bold text-on-surface"
                 >
                   Speaking roleplay
@@ -342,12 +342,9 @@ export default function LessonsPage() {
               </button>
               <button
                 onClick={() =>
-                  navigate('/practice', {
-                    state:
-                      selectedLesson.practiceFocus.type === 'vocabulary'
-                        ? { tab: 'vocabulary', word: selectedLesson.practiceFocus.word }
-                        : { tab: 'grammar', topicId: selectedLesson.practiceFocus.topicId },
-                  })
+                  selectedLesson.practiceFocus.type === 'vocabulary'
+                    ? navigate('/practice/vocabulary', { state: { word: selectedLesson.practiceFocus.word } })
+                    : navigate('/practice/grammar', { state: { topicId: selectedLesson.practiceFocus.topicId } })
                 }
                 className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold bg-secondary-container text-white shadow-lg shadow-secondary-container/20 flex items-center justify-center gap-2"
               >

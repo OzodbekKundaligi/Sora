@@ -74,6 +74,11 @@ export default function App() {
               <PracticePage />
             </ProtectedRoute>
           } />
+          <Route path="/practice/:tab" element={
+            <ProtectedRoute>
+              <PracticePage />
+            </ProtectedRoute>
+          } />
           <Route path="/placement-test" element={
             <ProtectedRoute>
               <PlacementTestPage />

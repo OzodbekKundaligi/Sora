@@ -132,7 +132,7 @@ export default function PlacementTestPage() {
                     Go to dashboard
                   </button>
                   <button
-                    onClick={() => navigate('/practice', { state: { tab: 'roleplay' } })}
+                    onClick={() => navigate('/practice/roleplay')}
                     className="px-5 py-3 rounded-2xl bg-secondary-container text-white font-bold"
                   >
                     Start speaking
