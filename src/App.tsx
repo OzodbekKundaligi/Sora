@@ -80,10 +80,9 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/teacher" element={
-            <ProtectedRoute>
-              <TeacherDashboardPage />
-            </ProtectedRoute>
+            <TeacherDashboardPage />
           } />
+          <Route path="/techer" element={<Navigate to="/teacher" replace />} />
           <Route path="/referral" element={
             <ProtectedRoute>
               <ReferralPage />
